@@ -26,7 +26,7 @@ impl Default for AppConfig {
             mount_point: if cfg!(target_os = "windows") {
                 "R:".to_string()
             } else {
-                home.join("Remnant Finder Drive")
+                home.join("Stone Project Drive")
                     .to_string_lossy()
                     .to_string()
             },

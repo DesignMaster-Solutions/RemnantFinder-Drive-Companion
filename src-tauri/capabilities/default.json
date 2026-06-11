@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Default capabilities for Remnant Finder Drive",
+  "description": "Default capabilities for Stone Project Drive",
   "windows": ["main"],
   "permissions": [
     "core:default",

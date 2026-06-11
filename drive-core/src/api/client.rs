@@ -16,7 +16,7 @@ impl DriveApiClient {
     pub fn new(base_url: impl Into<String>, token: impl Into<String>, company_id: impl Into<String>) -> Self {
         Self {
             http: Client::builder()
-                .user_agent("RemnantFinder-Drive/1.0")
+                .user_agent("StoneProject-Drive/1.0")
                 .timeout(Duration::from_secs(20))
                 .connect_timeout(Duration::from_secs(10))
                 .build()

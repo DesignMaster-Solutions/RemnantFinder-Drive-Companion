@@ -24,7 +24,7 @@ const MENU_LOGOUT: &str = "logout";
 const MENU_QUIT: &str = "quit";
 
 pub fn setup_tray(app: &mut App) -> tauri::Result<()> {
-    let show_i = MenuItem::with_id(app, MENU_SHOW, "Open Remnant Finder Drive", true, None::<&str>)?;
+    let show_i = MenuItem::with_id(app, MENU_SHOW, "Open Stone Project Drive", true, None::<&str>)?;
     let open_mount_i =
         MenuItem::with_id(app, MENU_OPEN_MOUNT, "Open Mount Folder", true, None::<&str>)?;
     let mount_i = MenuItem::with_id(app, MENU_MOUNT, "Mount Drive", true, None::<&str>)?;
@@ -56,7 +56,7 @@ pub fn setup_tray(app: &mut App) -> tauri::Result<()> {
     let mut builder = TrayIconBuilder::with_id(TRAY_ID)
         .icon(icon)
         .menu(&menu)
-        .tooltip("Remnant Finder Drive — Disconnected")
+        .tooltip("Stone Project Drive — Disconnected")
         .show_menu_on_left_click(false);
 
     #[cfg(target_os = "macos")]
@@ -152,7 +152,7 @@ pub fn refresh_tray(app: AppHandle) {
         Ok(state) => state,
         Err(_) => {
             if let Some(tray) = app.tray_by_id(TRAY_ID) {
-                let _ = tray.set_tooltip(Some("Remnant Finder Drive"));
+                let _ = tray.set_tooltip(Some("Stone Project Drive"));
             }
             return;
         }
@@ -203,7 +203,7 @@ pub fn attach_window_close_handler(window: &WebviewWindow) {
 
 fn tray_tooltip(state: &UiState) -> String {
     if !state.logged_in {
-        return "Remnant Finder Drive — Disconnected".to_string();
+        return "Stone Project Drive — Disconnected".to_string();
     }
 
     if state.sync_phase == "syncing" {
@@ -212,22 +212,22 @@ fn tray_tooltip(state: &UiState) -> String {
         } else {
             state.sync_detail.clone()
         };
-        return format!("Remnant Finder Drive — {detail}");
+        return format!("Stone Project Drive — {detail}");
     }
 
     if !state.online {
-        return "Remnant Finder Drive — Offline (pinned folders only)".to_string();
+        return "Stone Project Drive — Offline (pinned folders only)".to_string();
     }
 
     if state.mounted {
         return format!(
-            "Remnant Finder Drive — {} · {}",
+            "Stone Project Drive — {} · {}",
             state.mount_point, state.last_sync_human
         );
     }
 
     format!(
-        "Remnant Finder Drive — {} · Sign in & mount",
+        "Stone Project Drive — {} · Sign in & mount",
         state.company_name
     )
 }

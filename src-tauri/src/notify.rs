@@ -16,7 +16,7 @@ pub fn notify(app: &AppHandle, title: &str, body: &str) {
 pub fn notify_mount_success(app: &AppHandle, mount_point: &str) {
     notify(
         app,
-        "Remnant Finder Drive mounted",
+        "Stone Project Drive mounted",
         &format!("Open files at {mount_point}"),
     );
 }

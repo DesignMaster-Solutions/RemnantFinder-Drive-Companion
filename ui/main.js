@@ -211,7 +211,7 @@ async function checkForUpdate() {
       `Update available · v${update.latest_version}`;
     document.getElementById("update-notes").textContent =
       update.release_notes ||
-      "A newer version of Remnant Finder Drive is ready.";
+      "A newer version of Stone Project Drive is ready.";
     els.updateBanner.classList.remove("hidden");
   } catch (_) {
     els.updateBanner.classList.add("hidden");

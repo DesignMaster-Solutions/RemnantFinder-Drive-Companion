@@ -1,4 +1,4 @@
-//! Remnant Finder companion drive core library.
+//! Stone Project Drive companion core library.
 
 pub mod api;
 pub mod auth;

@@ -50,10 +50,10 @@ git add Cargo.toml Cargo.lock src-tauri/tauri.conf.json
 git add -u
 
 git commit -m "release: v$NEXT"
-git tag -a "v$NEXT" -m "Release v$NEXT"
+git tag -a "companion-v$NEXT" -m "Stone Project Drive $NEXT"
 
 git push origin main
-git push origin "v$NEXT"
+git push origin "companion-v$NEXT"
 
 echo ""
-echo "✅ Released v$NEXT → https://github.com/DesignMaster-Solutions/RemnantFinder-Drive-Companion/releases/tag/v$NEXT"
+echo "✅ Released companion-v$NEXT → https://github.com/DesignMaster-Solutions/StoneProject-CompanionDrive/releases/tag/v$NEXT"

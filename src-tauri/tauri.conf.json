@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Remnant Finder Drive",
+  "productName": "Stone Project Drive",
   "version": "1.0.0",
   "identifier": "com.remnantfinder.drive",
   "build": {
@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Remnant Finder Drive",
+        "title": "Stone Project Drive",
         "width": 440,
         "height": 720,
         "resizable": true

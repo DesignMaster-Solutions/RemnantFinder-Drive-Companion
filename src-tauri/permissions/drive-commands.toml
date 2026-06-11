@@ -1,6 +1,6 @@
 [[permission]]
 identifier = "allow-drive-commands"
-description = "Enables Remnant Finder Drive companion commands."
+description = "Enables Stone Project Drive companion commands."
 commands.allow = [
   "login",
   "logout",

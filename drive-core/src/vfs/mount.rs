@@ -174,7 +174,7 @@ fn run_mount_webdav_command(url: &str, mount_point: &str) -> Result<()> {
         .args([
             "-S",
             "-v",
-            "Remnant Finder",
+            "Stone Project",
             "-o",
             "nobrowse",
             url,
