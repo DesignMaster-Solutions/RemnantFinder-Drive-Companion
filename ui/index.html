@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Remnant Finder Drive</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main>
+      <header class="app-header">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true">RF</div>
+          <div>
+            <h1>Remnant Finder Drive</h1>
+            <p id="subtitle" class="subtitle">
+              Your company files, one click away
+            </p>
+          </div>
+        </div>
+        <div id="status-card" class="status-card status-disconnected">
+          <span id="status-dot" class="status-dot"></span>
+          <div class="status-copy">
+            <strong id="status-title">Not connected</strong>
+            <span id="status-detail">Sign in to mount your drive</span>
+          </div>
+        </div>
+      </header>
+
+      <section id="login-section" class="panel">
+        <h2>Sign in</h2>
+        <p class="panel-lead">
+          Use the same account as the Remnant Finder app.
+        </p>
+        <label
+          >Email<input
+            id="email"
+            type="email"
+            autocomplete="username"
+            placeholder="you@company.com"
+        /></label>
+        <label
+          >Password<input
+            id="password"
+            type="password"
+            autocomplete="current-password"
+            placeholder="••••••••"
+        /></label>
+        <details class="advanced">
+          <summary>Advanced</summary>
+          <label
+            >API URL<input
+              id="api-url"
+              type="url"
+              value="https://api.remnantfinderapp.com/api/v1"
+          /></label>
+        </details>
+        <button id="login-btn" class="btn-primary">Sign in</button>
+      </section>
+
+      <section id="drive-section" class="hidden">
+        <div id="mount-cta" class="mount-cta hidden">
+          <p>
+            Mount the drive to browse Projects, Clients, and company files in
+            Finder or Explorer.
+          </p>
+          <button id="mount-btn-primary" class="btn-primary btn-block">
+            Mount Drive
+          </button>
+        </div>
+
+        <div id="update-banner" class="update-banner hidden">
+          <div>
+            <strong id="update-title">Update available</strong>
+            <p id="update-notes" class="meta"></p>
+          </div>
+          <button id="update-btn" class="btn-secondary">Download</button>
+        </div>
+
+        <div class="toolbar">
+          <button id="mount-btn" class="hidden">Mount</button>
+          <button id="unmount-btn" class="btn-secondary hidden">Unmount</button>
+          <button id="sync-btn">Sync now</button>
+          <button id="open-folder-btn" class="btn-secondary" disabled>
+            Open folder
+          </button>
+          <button id="logout-btn" class="btn-ghost">Sign out</button>
+        </div>
+
+        <div class="panel compact">
+          <h3>Preferences</h3>
+          <label class="checkbox"
+            ><input id="auto-start" type="checkbox" /> Launch at login</label
+          >
+          <label class="checkbox"
+            ><input id="auto-mount" type="checkbox" /> Mount automatically when
+            signed in</label
+          >
+          <p class="hint">
+            <span id="app-version"></span> · Closing this window keeps the app in
+            your menu bar / system tray.
+          </p>
+        </div>
+
+        <div class="panel compact">
+          <h3>Offline folders</h3>
+          <p class="panel-lead">
+            Pin a folder to keep it available without internet.
+          </p>
+          <div class="folder-browser">
+            <div id="folder-breadcrumb" class="folder-breadcrumb">Drive</div>
+            <div class="folder-browser-row">
+              <select id="folder-picker" class="folder-picker">
+                <option value="">Select a folder…</option>
+              </select>
+              <button id="folder-open-btn" class="btn-secondary" type="button">
+                Open
+              </button>
+              <button id="folder-up-btn" class="btn-ghost" type="button">
+                Up
+              </button>
+            </div>
+          </div>
+          <div class="pin-row">
+            <input
+              id="pin-path"
+              type="text"
+              placeholder="Projects/Client/Project"
+            />
+            <button id="pin-btn" class="btn-secondary">Pin</button>
+          </div>
+          <ul id="pinned-list" class="pinned-list"></ul>
+          <p id="cache-usage" class="meta"></p>
+        </div>
+      </section>
+
+      <p id="error" class="toast error hidden" role="alert"></p>
+    </main>
+    <script src="main.js"></script>
+  </body>
+</html>

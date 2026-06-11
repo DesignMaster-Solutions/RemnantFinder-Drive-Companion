@@ -1,0 +1,14 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Default capabilities for Remnant Finder Drive",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "allow-drive-commands",
+    "shell:allow-open",
+    "opener:default",
+    "autostart:default",
+    "notification:default"
+  ]
+}

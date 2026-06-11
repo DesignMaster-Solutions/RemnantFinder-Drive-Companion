@@ -1,0 +1,18 @@
+[[permission]]
+identifier = "allow-drive-commands"
+description = "Enables Remnant Finder Drive companion commands."
+commands.allow = [
+  "login",
+  "logout",
+  "mount_drive",
+  "unmount_drive",
+  "sync_now",
+  "pin_folder",
+  "unpin_folder",
+  "get_state",
+  "open_mount",
+  "set_auto_start",
+  "set_auto_mount",
+  "list_drive_folders",
+  "check_for_update",
+]
