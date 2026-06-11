@@ -137,8 +137,18 @@ impl SyncEngine {
         if !node.is_file() {
             return Ok(());
         }
+        // Check if cached file is still fresh by comparing etags.
+        // If the node has no etag, fall back to presence-only check.
         if self.cache.read_cached_file(&node.path)?.is_some() {
-            return Ok(());
+            if let Some(server_etag) = &node.etag {
+                let cached_etag = self.cache.get_node_etag(&node.path)?;
+                if cached_etag.as_deref() == Some(server_etag.as_str()) {
+                    return Ok(()); // still fresh
+                }
+                info!("etag mismatch for {}, re-downloading", node.path);
+            } else {
+                return Ok(()); // no etag available, assume fresh
+            }
         }
         let bytes = self.api.download_node(node).await?;
         self.cache.write_cached_file(&node.path, &bytes)?;
@@ -235,25 +245,47 @@ impl SyncEngine {
         Ok(node)
     }
 
-    pub async fn run_background_loop(self, interval_secs: u64) {
+    pub async fn run_background_loop(self, _interval_secs: u64) {
+        // Base poll interval: 30s. After errors, back off: 5s → 10s → 20s → … → 120s cap.
+        const BASE_INTERVAL: u64 = 30;
+        const MAX_INTERVAL: u64 = 120;
+        let mut error_streak: u32 = 0;
+
         loop {
-            if self.is_online().await {
+            let had_error = if self.is_online().await {
+                let mut failed = false;
+
                 if let Err(e) = self.sync_changes().await {
                     error!("sync changes failed: {e}");
-                }
-                if let Ok(pinned) = self.cache.pinned_paths() {
+                    failed = true;
+                } else if let Ok(pinned) = self.cache.pinned_paths() {
                     for path in pinned {
                         self.status.set_syncing(format!("Updating offline copy of {path}"));
                         if let Err(e) = self.download_subtree(&path).await {
                             error!("pinned sync failed for {path}: {e}");
                             self.status.set_error(format!("Offline sync failed: {e}"));
+                            failed = true;
                         } else {
                             self.status.mark_synced();
                         }
                     }
                 }
+                failed
+            } else {
+                // Offline — retry sooner to detect reconnection
+                true
+            };
+
+            if had_error {
+                error_streak += 1;
+                // 5s, 10s, 20s, 40s, 80s, 120s (capped)
+                let delay = (5u64 * (1u64 << error_streak.min(5))).min(MAX_INTERVAL);
+                tracing::debug!("sync error streak={error_streak}, retrying in {delay}s");
+                tokio::time::sleep(std::time::Duration::from_secs(delay)).await;
+            } else {
+                error_streak = 0;
+                tokio::time::sleep(std::time::Duration::from_secs(BASE_INTERVAL)).await;
             }
-            tokio::time::sleep(std::time::Duration::from_secs(interval_secs)).await;
         }
     }
 }

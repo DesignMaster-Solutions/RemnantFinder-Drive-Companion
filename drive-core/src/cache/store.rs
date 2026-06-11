@@ -40,6 +40,7 @@ impl CacheStore {
                 status TEXT NOT NULL,
                 error TEXT
             );
+            CREATE INDEX IF NOT EXISTS idx_nodes_path ON nodes(path);
             ",
         )?;
         Ok(Self {
@@ -125,6 +126,16 @@ impl CacheStore {
         if let Some(row) = rows.next()? {
             let json: String = row.get(0)?;
             return Ok(Some(serde_json::from_str(&json)?));
+        }
+        Ok(None)
+    }
+
+    pub fn get_node_etag(&self, path: &str) -> Result<Option<String>> {
+        let conn = self.conn.lock();
+        let mut stmt = conn.prepare("SELECT etag FROM nodes WHERE path = ?1")?;
+        let mut rows = stmt.query(params![path])?;
+        if let Some(row) = rows.next()? {
+            return Ok(row.get(0)?);
         }
         Ok(None)
     }

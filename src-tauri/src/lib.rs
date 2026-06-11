@@ -522,7 +522,7 @@ pub fn run() {
 
             if let Some(engine) = sync {
                 tauri::async_runtime::spawn(async move {
-                    engine.run_background_loop(120).await;
+                    engine.run_background_loop(30).await;
                 });
             }
 
@@ -532,10 +532,11 @@ pub fn run() {
                 attach_window_close_handler(&window);
             }
 
+            // Always refresh tray icon so it reflects restored login state on startup
+            refresh_tray(app.handle().clone());
+
             if should_start_hidden() {
                 hide_main_window(&app.handle());
-            } else {
-                refresh_tray(app.handle().clone());
             }
 
             if logged_in && config.auto_mount {

@@ -1,9 +1,100 @@
 use crate::{build_ui_state, mount_drive_internal, open_mount_internal, sync_now_internal, AppState, UiState};
 use tauri::{
+    image::Image,
     menu::{Menu, MenuItem, PredefinedMenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     App, AppHandle, Manager, WebviewWindow,
 };
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum TrayState {
+    Disconnected,
+    Connected,
+    Mounted,
+    Syncing,
+    Error,
+    Offline,
+}
+
+impl TrayState {
+    pub fn from_ui(state: &UiState) -> Self {
+        if !state.logged_in {
+            return TrayState::Disconnected;
+        }
+        if state.sync_phase == "syncing" {
+            return TrayState::Syncing;
+        }
+        if state.sync_phase == "error" {
+            return TrayState::Error;
+        }
+        if !state.online {
+            return TrayState::Offline;
+        }
+        if state.mounted {
+            return TrayState::Mounted;
+        }
+        TrayState::Connected
+    }
+}
+
+/// Overlay a 4×4 colored dot (bottom-right corner) onto the base icon bytes.
+/// `rgba` is (r, g, b, a). Works with 32×32 RGBA raw pixels (width=32).
+fn overlay_dot(base_rgba: &[u8], width: u32, height: u32, rgba: (u8, u8, u8, u8)) -> Vec<u8> {
+    let mut pixels = base_rgba.to_vec();
+    let (r, g, b, a) = rgba;
+    let dot_size: u32 = 6;
+    let margin: u32 = 2;
+    let x_start = width.saturating_sub(dot_size + margin);
+    let y_start = height.saturating_sub(dot_size + margin);
+    for dy in 0..dot_size {
+        for dx in 0..dot_size {
+            let x = x_start + dx;
+            let y = y_start + dy;
+            if x < width && y < height {
+                let idx = ((y * width + x) * 4) as usize;
+                if idx + 4 <= pixels.len() {
+                    pixels[idx] = r;
+                    pixels[idx + 1] = g;
+                    pixels[idx + 2] = b;
+                    pixels[idx + 3] = a;
+                }
+            }
+        }
+    }
+    pixels
+}
+
+pub fn set_tray_icon(app: &AppHandle, state: &TrayState) {
+    let Some(tray) = app.tray_by_id(TRAY_ID) else { return };
+
+    // On macOS the icon is rendered as template (monochrome) — dot overlay is the
+    // only reliable way to indicate state without requiring separate asset files.
+    let base = match app.default_window_icon() {
+        Some(icon) => icon.clone(),
+        None => return,
+    };
+
+    // Decode base icon to raw RGBA for pixel manipulation.
+    let (width, height) = (base.width(), base.height());
+    let rgba_base = base.rgba().to_vec();
+
+    let dot_color: Option<(u8, u8, u8, u8)> = match state {
+        TrayState::Mounted  => Some((34, 197, 94, 255)),   // green
+        TrayState::Syncing  => Some((59, 130, 246, 255)),  // blue
+        TrayState::Error    => Some((239, 68, 68, 255)),   // red
+        TrayState::Offline  => Some((156, 163, 175, 255)), // gray
+        TrayState::Connected => Some((234, 179, 8, 255)),  // yellow (ready, not mounted)
+        TrayState::Disconnected => None,                   // plain icon — no dot
+    };
+
+    let final_rgba = match dot_color {
+        Some(color) => overlay_dot(&rgba_base, width, height, color),
+        None => rgba_base,
+    };
+
+    let icon = Image::new(&final_rgba, width, height);
+    let _ = tray.set_icon(Some(icon));
+}
 
 pub struct TrayMenuHandles {
     open_mount: MenuItem<tauri::Wry>,
@@ -59,9 +150,11 @@ pub fn setup_tray(app: &mut App) -> tauri::Result<()> {
         .tooltip("Stone Project Drive — Disconnected")
         .show_menu_on_left_click(false);
 
+    // Do NOT set icon_as_template — we use colored dot overlays to indicate state,
+    // which requires the icon to be rendered in color, not as a template (monochrome).
     #[cfg(target_os = "macos")]
     {
-        builder = builder.icon_as_template(true);
+        builder = builder.icon_as_template(false);
     }
 
     builder
@@ -161,6 +254,10 @@ pub fn refresh_tray(app: AppHandle) {
     if let Some(tray) = app.tray_by_id(TRAY_ID) {
         let _ = tray.set_tooltip(Some(&tray_tooltip(&state)));
     }
+
+    // Update icon to reflect current state
+    let tray_state = TrayState::from_ui(&state);
+    set_tray_icon(&app, &tray_state);
 
     if let Some(handles) = app.try_state::<TrayMenuHandles>() {
         let _ = handles.open_mount.set_enabled(state.logged_in && state.mounted);
