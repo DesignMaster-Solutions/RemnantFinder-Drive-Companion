@@ -53,10 +53,14 @@ impl DriveApiClient {
     }
 
     pub async fn login(base_url: &str, email: &str, password: &str) -> Result<(String, serde_json::Value)> {
-        let client = Client::new();
+        let client = Client::builder()
+            .user_agent("StoneProject-Drive/1.0")
+            .build()
+            .context("build HTTP client")?;
         let url = format!("{}/auth/login", base_url.trim_end_matches('/'));
         let response = client
             .post(&url)
+            .header("X-Client", "companion-drive")
             .json(&serde_json::json!({ "email": email, "password": password }))
             .send()
             .await
