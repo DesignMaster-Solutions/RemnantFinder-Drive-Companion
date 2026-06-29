@@ -18,18 +18,51 @@ impl WebDavServer {
         Self { sync, port }
     }
 
-    pub async fn run(self) -> Result<()> {
-        let listener = TcpListener::bind(("127.0.0.1", self.port)).await?;
-        tracing::info!("WebDAV server listening on 127.0.0.1:{}", self.port);
+    /// Bind the port, signal readiness (or the bind error) through `ready`, then
+    /// serve until `shutdown` resolves. Meant to run on a dedicated thread/runtime
+    /// so the UI's async runtime can never starve it (which previously left the
+    /// server unbound when `net use` ran, producing "system error 67").
+    pub async fn serve_until_shutdown(
+        self,
+        ready: tokio::sync::oneshot::Sender<std::io::Result<()>>,
+        mut shutdown: tokio::sync::oneshot::Receiver<()>,
+    ) {
+        let port = self.port;
         let sync = Arc::new(self.sync);
+
+        let listener = match TcpListener::bind(("127.0.0.1", port)).await {
+            Ok(listener) => listener,
+            Err(e) => {
+                tracing::error!("WebDAV server failed to bind 127.0.0.1:{port}: {e}");
+                let _ = ready.send(Err(e));
+                return;
+            }
+        };
+        tracing::info!("WebDAV server listening on 127.0.0.1:{port}");
+        let _ = ready.send(Ok(()));
+
         loop {
-            let (mut socket, _) = listener.accept().await?;
-            let sync = sync.clone();
-            tokio::spawn(async move {
-                if let Err(e) = handle_connection(&mut socket, sync).await {
-                    tracing::debug!("connection closed: {e}");
+            tokio::select! {
+                accepted = listener.accept() => {
+                    match accepted {
+                        Ok((mut socket, _)) => {
+                            let sync = sync.clone();
+                            tokio::spawn(async move {
+                                if let Err(e) = handle_connection(&mut socket, sync).await {
+                                    tracing::debug!("connection closed: {e}");
+                                }
+                            });
+                        }
+                        Err(e) => {
+                            tracing::warn!("WebDAV accept failed: {e}");
+                        }
+                    }
                 }
-            });
+                _ = &mut shutdown => {
+                    tracing::info!("WebDAV server on 127.0.0.1:{port} shutting down");
+                    break;
+                }
+            }
         }
     }
 }
@@ -144,18 +177,27 @@ async fn process_request(
             .await
         }
         "PROPFIND" => {
-            let nodes = match sync
-                .list_directory(if virtual_path.is_empty() {
-                    ""
-                } else {
-                    &virtual_path
-                })
-                .await
-            {
-                Ok(nodes) => nodes,
-                Err(e) => {
-                    tracing::warn!("PROPFIND failed for {virtual_path:?}: {e}");
-                    Vec::new()
+            // RFC 4918: Depth:0 must describe ONLY the named resource. Returning
+            // children for a Depth:0 PROPFIND makes the Windows WebDAV redirector
+            // treat the server as non-compliant and reject `net use` with
+            // "system error 67" — so only enumerate children for Depth:1/infinity.
+            let depth = parse_header(&request, "Depth").unwrap_or_else(|| "1".to_string());
+            let nodes = if depth.trim() == "0" {
+                Vec::new()
+            } else {
+                match sync
+                    .list_directory(if virtual_path.is_empty() {
+                        ""
+                    } else {
+                        &virtual_path
+                    })
+                    .await
+                {
+                    Ok(nodes) => nodes,
+                    Err(e) => {
+                        tracing::warn!("PROPFIND failed for {virtual_path:?}: {e}");
+                        Vec::new()
+                    }
                 }
             };
             let body = propfind_xml(&virtual_path, &nodes);

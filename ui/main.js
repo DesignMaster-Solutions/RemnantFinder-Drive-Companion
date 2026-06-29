@@ -238,6 +238,71 @@ async function handleLogin() {
   }
 }
 
+let pairingTimer = null;
+let pairingActive = false;
+
+function setPairingUi(visible, code) {
+  document
+    .getElementById("pairing-status")
+    .classList.toggle("hidden", !visible);
+  document.getElementById("sso-btn").disabled = visible;
+  els.loginBtn.disabled = visible;
+  if (code) document.getElementById("pairing-code").textContent = code;
+}
+
+function stopPairing() {
+  pairingActive = false;
+  if (pairingTimer) {
+    clearTimeout(pairingTimer);
+    pairingTimer = null;
+  }
+  setPairingUi(false);
+}
+
+// SSO / Google sign-in via device pairing: start a pairing, open the browser to
+// approve, then poll until the backend hands back the token (handled in Rust).
+async function handleSso() {
+  clearError();
+  document.getElementById("sso-btn").disabled = true;
+  const apiUrl = document.getElementById("api-url").value.trim();
+  try {
+    const res = await tauriInvoke("pair_start", { apiUrl });
+    setPairingUi(true, res.user_code);
+    if (res.verification_uri) {
+      try {
+        await window.__TAURI__.opener.openUrl(res.verification_uri);
+      } catch (_) {
+        // The code is shown on screen, so the user can open the page manually.
+      }
+    }
+    pairingActive = true;
+    const intervalMs = (res.interval || 5) * 1000;
+    const deviceCode = res.device_code;
+    const poll = async () => {
+      if (!pairingActive) return;
+      try {
+        const status = await tauriInvoke("pair_poll", { apiUrl, deviceCode });
+        if (status === "approved") {
+          stopPairing();
+          els.folderPicker.dataset.loaded = "";
+          await refreshState();
+          await checkForUpdate();
+          return;
+        }
+      } catch (e) {
+        stopPairing();
+        showError(formatInvokeError(e));
+        return;
+      }
+      if (pairingActive) pairingTimer = setTimeout(poll, intervalMs);
+    };
+    pairingTimer = setTimeout(poll, intervalMs);
+  } catch (e) {
+    stopPairing();
+    showError(formatInvokeError(e));
+  }
+}
+
 async function handleMount(button) {
   clearError();
   setButtonLoading(
@@ -265,6 +330,9 @@ els.loginBtn.addEventListener("click", handleLogin);
 document.getElementById("password").addEventListener("keydown", (e) => {
   if (e.key === "Enter") handleLogin();
 });
+
+document.getElementById("sso-btn").addEventListener("click", handleSso);
+document.getElementById("pairing-cancel").addEventListener("click", stopPairing);
 
 document.getElementById("mount-btn-primary").addEventListener("click", (e) => {
   handleMount(e.currentTarget);

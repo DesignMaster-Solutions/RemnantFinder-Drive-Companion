@@ -114,6 +114,66 @@ impl DriveApiClient {
         ))
     }
 
+    /// Start a device pairing (RFC 8628 style). Returns the data object:
+    /// `user_code`, `device_code`, `verification_uri(_complete)`, `interval`, `expires_in`.
+    pub async fn pair_start(base_url: &str) -> Result<serde_json::Value> {
+        let client = Client::builder()
+            .user_agent("StoneProject-Drive/1.0")
+            .build()
+            .context("build HTTP client")?;
+        let url = format!("{}/companion/pair/start", base_url.trim_end_matches('/'));
+        let response = client
+            .post(&url)
+            .header("X-Client", "companion-drive")
+            .json(&serde_json::json!({}))
+            .send()
+            .await
+            .context("network error contacting API")?;
+        let body = response.text().await.context("read pair/start response")?;
+        let envelope: ApiEnvelope<serde_json::Value> = serde_json::from_str(&body).map_err(|_| {
+            anyhow!(
+                "invalid pairing response: {}",
+                body.chars().take(200).collect::<String>()
+            )
+        })?;
+        if !envelope.success {
+            return Err(anyhow!(envelope
+                .message
+                .unwrap_or_else(|| "could not start pairing".into())));
+        }
+        envelope.data.ok_or_else(|| anyhow!("missing pairing data"))
+    }
+
+    /// Poll a pending pairing with its `device_code`. Returns the data object
+    /// with `status` ("pending"|"approved"); when approved it also carries
+    /// `token` + `company_id`. Errors when the code is expired/invalid.
+    pub async fn pair_poll(base_url: &str, device_code: &str) -> Result<serde_json::Value> {
+        let client = Client::builder()
+            .user_agent("StoneProject-Drive/1.0")
+            .build()
+            .context("build HTTP client")?;
+        let url = format!("{}/companion/pair/poll", base_url.trim_end_matches('/'));
+        let response = client
+            .post(&url)
+            .json(&serde_json::json!({ "device_code": device_code }))
+            .send()
+            .await
+            .context("network error contacting API")?;
+        let body = response.text().await.context("read pair/poll response")?;
+        let envelope: ApiEnvelope<serde_json::Value> = serde_json::from_str(&body).map_err(|_| {
+            anyhow!(
+                "invalid poll response: {}",
+                body.chars().take(200).collect::<String>()
+            )
+        })?;
+        if !envelope.success {
+            return Err(anyhow!(envelope
+                .message
+                .unwrap_or_else(|| "pairing code expired — start again".into())));
+        }
+        envelope.data.ok_or_else(|| anyhow!("missing poll data"))
+    }
+
     pub async fn list_tree(&self, path: &str, page: u32) -> Result<TreeResponse> {
         let response = self
             .http

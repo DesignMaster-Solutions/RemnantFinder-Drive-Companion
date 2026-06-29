@@ -15,4 +15,6 @@ commands.allow = [
   "set_auto_mount",
   "list_drive_folders",
   "check_for_update",
+  "pair_start",
+  "pair_poll",
 ]

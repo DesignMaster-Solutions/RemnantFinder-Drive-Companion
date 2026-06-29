@@ -56,6 +56,23 @@
           /></label>
         </details>
         <button id="login-btn" class="btn-primary">Sign in</button>
+
+        <div class="sso-divider"><span>or</span></div>
+        <button id="sso-btn" class="btn-secondary btn-block">
+          Sign in with your Stone Project account
+        </button>
+        <p class="sso-hint">
+          Use this if you sign in to Stone Project with Google.
+        </p>
+
+        <div id="pairing-status" class="pairing-status hidden">
+          <p class="pairing-lead">Approve this device in your browser:</p>
+          <div id="pairing-code" class="pairing-code"></div>
+          <p class="pairing-hint">
+            A browser window opened so you can approve. Waiting for approval…
+          </p>
+          <button id="pairing-cancel" class="btn-ghost">Cancel</button>
+        </div>
       </section>
 
       <section id="drive-section" class="hidden">

@@ -55,6 +55,14 @@ pub struct UpdateCheckResult {
     release_notes: Option<String>,
 }
 
+#[derive(Serialize, Clone)]
+pub struct PairStartResult {
+    user_code: String,
+    verification_uri: String,
+    device_code: String,
+    interval: u64,
+}
+
 fn profile_from_login(data: &serde_json::Value) -> (String, String) {
     let user = data.get("user");
     let email = user
@@ -250,6 +258,102 @@ async fn login(
     }
 
     Ok(())
+}
+
+/// Start device pairing — used by the "Sign in with your Stone Project account"
+/// flow so Google/SSO users (no password) can authorize the companion from the
+/// already-logged-in web app.
+#[tauri::command]
+async fn pair_start(state: State<'_, AppState>, api_url: String) -> Result<PairStartResult, String> {
+    let api_url = api_url.trim().to_string();
+    // Persist the chosen API URL so the subsequent poll uses the same base.
+    {
+        let mut config = state.config.lock();
+        config.api_base_url = api_url.clone();
+    }
+
+    let data = DriveApiClient::pair_start(&api_url)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let pick = |key: &str| {
+        data.get(key)
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string()
+    };
+    let complete = pick("verification_uri_complete");
+    let verification_uri = if complete.is_empty() {
+        pick("verification_uri")
+    } else {
+        complete
+    };
+
+    Ok(PairStartResult {
+        user_code: pick("user_code"),
+        verification_uri,
+        device_code: pick("device_code"),
+        interval: data.get("interval").and_then(|v| v.as_u64()).unwrap_or(5),
+    })
+}
+
+/// Poll a pending pairing. Returns "pending" until approved; on "approved" it
+/// completes the session (token + company_id) exactly like the password login.
+#[tauri::command]
+async fn pair_poll(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    api_url: String,
+    device_code: String,
+) -> Result<String, String> {
+    let api_url = api_url.trim().to_string();
+    let data = DriveApiClient::pair_poll(&api_url, &device_code)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let status = data
+        .get("status")
+        .and_then(|v| v.as_str())
+        .unwrap_or("pending");
+    if status != "approved" {
+        return Ok("pending".to_string());
+    }
+
+    let token = data
+        .get("token")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| "approved pairing missing token".to_string())?
+        .to_string();
+    let company_id = data
+        .get("company_id")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| "approved pairing missing company_id".to_string())?
+        .to_string();
+
+    let mut config = state.config.lock().clone();
+    config.api_base_url = api_url.clone();
+    config.company_id = Some(company_id.clone());
+
+    auth::save_token(&token).map_err(|e| e.to_string())?;
+    auth::save_company_id(&company_id).map_err(|e| e.to_string())?;
+
+    let sync = build_sync(&config, &token, &company_id).map_err(|e| e.to_string())?;
+    let background = sync.clone();
+    tauri::async_runtime::spawn(async move {
+        background.run_background_loop(120).await;
+    });
+    *state.sync.lock() = Some(sync);
+    *state.logged_in.lock() = true;
+    *state.config.lock() = config.clone();
+    persist_config(&config)?;
+
+    emit_status(&app);
+
+    if config.auto_mount {
+        mount_drive_internal(&app).await?;
+    }
+
+    Ok("approved".to_string())
 }
 
 #[tauri::command]
@@ -494,6 +598,15 @@ pub fn run() {
         .init();
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            // A second launch focuses the existing window instead of starting a
+            // rival instance that would fight over port 17817 and drive R:.
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.unminimize();
+                let _ = window.set_focus();
+            }
+        }))
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
@@ -567,6 +680,8 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             login,
+            pair_start,
+            pair_poll,
             logout,
             mount_drive,
             unmount_drive,

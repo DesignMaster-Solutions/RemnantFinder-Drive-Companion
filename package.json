@@ -1,7 +1,7 @@
 {
   "name": "remnant-finder-drive",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.0.7",
   "type": "module",
   "scripts": {
     "dev": "tauri dev",
